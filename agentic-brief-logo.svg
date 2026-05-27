@@ -1,0 +1,36 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="72%" cy="25%" r="85%">
+      <stop offset="0" stop-color="#172554"/>
+      <stop offset="0.45" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#050816"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="210" y1="210" x2="814" y2="814">
+      <stop stop-color="#58D6FF"/>
+      <stop offset="0.55" stop-color="#4D77FF"/>
+      <stop offset="1" stop-color="#976AFF"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" stroke="#7CA5FF" stroke-opacity="0.08"/>
+    </pattern>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#grid)"/>
+  <circle cx="512" cy="512" r="350" stroke="#58D6FF" stroke-opacity="0.32" stroke-width="4"/>
+  <circle cx="512" cy="512" r="260" stroke="#4D77FF" stroke-opacity="0.28" stroke-width="3"/>
+  <circle cx="512" cy="512" r="176" stroke="#976AFF" stroke-opacity="0.30" stroke-width="3"/>
+  <path d="M308 330L512 238L716 330V590L512 786L308 590V330Z" stroke="url(#accent)" stroke-width="8" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M512 238V786M308 330L512 512L716 330M308 590L512 512L716 590" stroke="#BFD7FF" stroke-opacity="0.45" stroke-width="4"/>
+  <circle cx="512" cy="238" r="18" fill="#58D6FF"/>
+  <circle cx="308" cy="330" r="18" fill="#4D77FF"/>
+  <circle cx="716" cy="330" r="18" fill="#976AFF"/>
+  <circle cx="308" cy="590" r="18" fill="#58D6FF"/>
+  <circle cx="716" cy="590" r="18" fill="#4D77FF"/>
+  <circle cx="512" cy="786" r="18" fill="#976AFF"/>
+  <circle cx="512" cy="512" r="42" fill="#0B1020" stroke="#EAF2FF" stroke-opacity="0.75" stroke-width="4"/>
+  <text x="512" y="905" text-anchor="middle" fill="#B8C7E6" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="700" letter-spacing="4">AGENTIC BRIEF</text>
+</svg>
