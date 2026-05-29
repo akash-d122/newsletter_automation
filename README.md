@@ -11,7 +11,7 @@ Local files are for processing. Final deliverables should live in the relevant c
 
 ## Run The Newsletter Pipeline
 
-Dry-run mode is the default and does not call Tavily, OpenAI, or Gmail:
+Dry-run mode is the default and does not call Gemini, Tavily, or Gmail:
 
 ```powershell
 python tools/run_newsletter_pipeline.py "AI agents for small businesses" --recipients you@example.com
@@ -25,4 +25,6 @@ Live mode calls external APIs and sends email through Gmail API OAuth:
 python tools/run_newsletter_pipeline.py "AI agents for small businesses" --recipients you@example.com --live
 ```
 
-Required live credentials live in `.env`: `TAVILY_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GMAIL_SENDER_EMAIL`, `NEWSLETTER_DEFAULT_RECIPIENTS`, and `NEWSLETTER_FROM_NAME`.
+Required live credentials live in `.env`: `GEMINI_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GMAIL_SENDER_EMAIL`, `NEWSLETTER_DEFAULT_RECIPIENTS`, and `NEWSLETTER_FROM_NAME`. `TAVILY_API_KEY` is only required when `NEWSLETTER_RESEARCH_PROVIDER=tavily`.
+
+The default research provider is Tavily, reserving Gemini quota for `gemini-3.5-flash` newsletter copy and infographic prompt generation. Gmail delivery stays on Gmail API OAuth because Google recommends Sign in with Google instead of app passwords for account security.
