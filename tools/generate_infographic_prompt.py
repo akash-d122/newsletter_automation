@@ -3,48 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
-from typing import Any
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from tools.common.config import ConfigError, load_settings
 from tools.common.file_io import read_json, write_text
+from tools.common.gemini import extract_text, post_generate_content, thinking_config
 from tools.common.logging_setup import setup_logger
 from tools.common.run_context import get_run_context, record_error
-
-
-OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-
-
-def _post_openai(api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        OPENAI_RESPONSES_URL,
-        data=data,
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"OpenAI request failed with HTTP {exc.code}: {body[:500]}") from exc
-
-
-def _extract_text(response: dict[str, Any]) -> str:
-    if response.get("output_text"):
-        return response["output_text"].strip()
-    chunks: list[str] = []
-    for output in response.get("output", []):
-        for content in output.get("content", []):
-            if content.get("text"):
-                chunks.append(content["text"])
-    return "\n".join(chunks).strip()
+from tools.common.text_cleaning import clean_text
 
 
 def _fallback_prompt(newsletter: dict[str, Any]) -> str:
@@ -73,19 +42,25 @@ def generate_infographic_prompt(run_id: str, dry_run: bool = False) -> str:
         prompt = _fallback_prompt(newsletter)
     else:
         request_prompt = (
-            "Write one detailed production-ready prompt for an infographic image generator. "
-            "Include layout, visual hierarchy, labels, color guidance, aspect ratio, and exclusions. "
-            "Do not include markdown fences.\n\n"
+            "Write one production-ready prompt for an infographic image generator. "
+            "Outcome: an art-directable prompt that turns the newsletter's core idea into a "
+            "clear editorial visual. Include layout, visual hierarchy, labels, color guidance, "
+            "aspect ratio, and exclusions. Do not include markdown fences.\n\n"
             f"Newsletter JSON:\n{json.dumps(newsletter, ensure_ascii=False)}"
         )
-        response = _post_openai(
-            settings.openai_api_key,
-            {"model": settings.openai_text_model, "input": request_prompt, "temperature": 0.5},
+        response = post_generate_content(
+            settings.gemini_api_key,
+            settings.gemini_text_model,
+            {
+                "contents": [{"parts": [{"text": request_prompt}]}],
+                "generationConfig": thinking_config(settings.gemini_thinking_level),
+            },
         )
-        prompt = _extract_text(response)
+        prompt = extract_text(response)
         if not prompt:
-            raise RuntimeError("OpenAI returned an empty infographic prompt.")
+            raise RuntimeError("Gemini returned an empty infographic prompt.")
 
+    prompt = clean_text(prompt)
     write_text(context.run_dir / "infographic_prompt.txt", prompt)
     logger.info("Wrote infographic_prompt.txt")
     return prompt

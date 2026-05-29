@@ -41,8 +41,7 @@ All artifacts are saved under `.tmp/runs/<run_id>/`:
 
 Required for live mode:
 
-- `TAVILY_API_KEY`
-- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
@@ -52,15 +51,21 @@ Required for live mode:
 
 Optional:
 
-- `OPENAI_TEXT_MODEL`, defaults to `gpt-4.1-mini`
+- `TAVILY_API_KEY`, required only when `NEWSLETTER_RESEARCH_PROVIDER=tavily`
+- `NEWSLETTER_RESEARCH_PROVIDER`, defaults to `tavily`
+- `GEMINI_RESEARCH_MODEL`, defaults to `gemini-3.5-flash`
+- `GEMINI_TEXT_MODEL`, defaults to `gemini-3.5-flash`
+- `GEMINI_THINKING_LEVEL`, defaults to `low`
 - `NEWSLETTER_SEARCH_DEPTH`, defaults to `basic`
 - `NEWSLETTER_MAX_RESULTS`, defaults to `5`
 
 ## Operating Notes
 
 - Start with `--dry-run` until artifacts look correct.
-- Live research and generation call external APIs and may incur cost.
+- Live research and generation call Gemini/Tavily APIs and may incur cost.
+- Use Tavily for research by default to reserve Gemini quota for newsletter writing and infographic prompts.
 - Live Gmail delivery must only be run after explicit approval.
+- Gmail API OAuth remains the default because Google recommends Sign in with Google over Gmail app passwords for account security.
 - If a tool fails, read `run.log` and `errors.json`, fix the deterministic tool, rerun the failed stage, and update this workflow if a reusable lesson was learned.
 
 ## Edge Cases

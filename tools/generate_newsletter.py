@@ -3,48 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
-from typing import Any
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from tools.common.config import ConfigError, load_settings
 from tools.common.file_io import read_json, write_json, write_text
+from tools.common.gemini import extract_text, post_generate_content, thinking_config
 from tools.common.logging_setup import setup_logger
 from tools.common.run_context import get_run_context, record_error, utc_now_iso
-
-
-OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-
-
-def _post_openai(api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        OPENAI_RESPONSES_URL,
-        data=data,
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=90) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"OpenAI request failed with HTTP {exc.code}: {body[:500]}") from exc
-
-
-def _extract_text(response: dict[str, Any]) -> str:
-    if response.get("output_text"):
-        return response["output_text"]
-    chunks: list[str] = []
-    for output in response.get("output", []):
-        for content in output.get("content", []):
-            if content.get("type") in {"output_text", "text"} and content.get("text"):
-                chunks.append(content["text"])
-    return "\n".join(chunks).strip()
+from tools.common.text_cleaning import clean_data
 
 
 def _fallback_newsletter(research: dict[str, Any]) -> dict[str, Any]:
@@ -116,6 +85,42 @@ def _parse_newsletter_json(text: str) -> dict[str, Any]:
     return data
 
 
+def _newsletter_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "topic": {"type": "string"},
+            "subject": {"type": "string"},
+            "preheader": {"type": "string"},
+            "headline": {"type": "string"},
+            "intro": {"type": "string"},
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "bullets": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["title", "body", "bullets"],
+                },
+            },
+            "takeaway": {"type": "string"},
+            "cta": {"type": "string"},
+            "sources": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}, "url": {"type": "string"}},
+                    "required": ["title", "url"],
+                },
+            },
+        },
+        "required": ["topic", "subject", "preheader", "headline", "intro", "sections", "takeaway", "cta", "sources"],
+    }
+
+
 def generate_newsletter(run_id: str, dry_run: bool = False) -> dict[str, Any]:
     context = get_run_context(run_id)
     logger = setup_logger("generate_newsletter", context.log_path)
@@ -130,19 +135,31 @@ def generate_newsletter(run_id: str, dry_run: bool = False) -> dict[str, Any]:
         newsletter = _fallback_newsletter(research)
     else:
         prompt = (
-            "Create a professional newsletter as strict JSON with keys: "
-            "topic, subject, preheader, headline, intro, sections, takeaway, cta, sources. "
-            "Each section must have title, body, and bullets. Use only the provided research.\n\n"
+            "Write polished professional newsletter copy from the provided research. "
+            "Outcome: a clear, credible, publication-ready draft with a strong subject line, "
+            "useful executive framing, specific insights, and no unsupported claims. "
+            "Return strict JSON with keys: topic, subject, preheader, headline, intro, "
+            "sections, takeaway, cta, sources. Each section must have title, body, and bullets. "
+            "Use only the provided research and keep the tone confident, concise, and editorial.\n\n"
             f"Research:\n{json.dumps(research, ensure_ascii=False)}"
         )
-        response = _post_openai(
-            settings.openai_api_key,
-            {"model": settings.openai_text_model, "input": prompt, "temperature": 0.4},
+        generation_config = thinking_config(settings.gemini_thinking_level)
+        generation_config["responseMimeType"] = "application/json"
+        generation_config["responseSchema"] = _newsletter_schema()
+        response = post_generate_content(
+            settings.gemini_api_key,
+            settings.gemini_text_model,
+            {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": generation_config,
+            },
         )
-        newsletter = _parse_newsletter_json(_extract_text(response))
+        newsletter = _parse_newsletter_json(extract_text(response))
         newsletter["generated_at"] = utc_now_iso()
-        newsletter["generation_mode"] = "openai"
+        newsletter["generation_mode"] = "gemini"
+        newsletter["model"] = settings.gemini_text_model
 
+    newsletter = clean_data(newsletter)
     write_json(context.run_dir / "newsletter.json", newsletter)
     write_text(context.run_dir / "draft.md", _markdown(newsletter))
     logger.info("Wrote newsletter.json and draft.md")

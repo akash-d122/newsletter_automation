@@ -18,6 +18,7 @@ from tools.common.config import ConfigError, load_settings, parse_recipients
 from tools.common.file_io import read_json, write_json
 from tools.common.logging_setup import setup_logger
 from tools.common.run_context import get_run_context, record_error, utc_now_iso
+from tools.common.text_cleaning import clean_data
 
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -50,12 +51,36 @@ def _access_token(client_id: str, client_secret: str, refresh_token: str) -> str
     return token
 
 
-def _message_raw(sender: str, from_name: str, recipients: list[str], subject: str, html_body: str) -> str:
+def _plain_text(newsletter: dict[str, Any]) -> str:
+    lines = [
+        newsletter.get("headline", newsletter.get("subject", "Newsletter")),
+        "",
+        newsletter.get("intro", ""),
+        "",
+        "Executive Takeaway",
+        newsletter.get("takeaway", ""),
+        "",
+    ]
+    for section in newsletter.get("sections", []):
+        lines.extend([section.get("title", ""), "", section.get("body", "")])
+        for bullet in section.get("bullets", []):
+            lines.append(f"- {bullet}")
+        lines.append("")
+    if newsletter.get("cta"):
+        lines.extend(["Next Step", newsletter["cta"], ""])
+    if newsletter.get("sources"):
+        lines.append("Sources")
+        for source in newsletter["sources"]:
+            lines.append(f"- {source.get('title', 'Source')}: {source.get('url', '')}")
+    return "\n".join(line for line in lines if line is not None).strip()
+
+
+def _message_raw(sender: str, from_name: str, recipients: list[str], subject: str, html_body: str, newsletter: dict[str, Any]) -> str:
     message = EmailMessage()
     message["From"] = f"{from_name} <{sender}>"
     message["To"] = ", ".join(recipients)
     message["Subject"] = subject
-    message.set_content("This newsletter requires an HTML-capable email client.")
+    message.set_content(_plain_text(newsletter))
     message.add_alternative(html_body, subtype="html")
     encoded = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
     return encoded.rstrip("=")
@@ -72,7 +97,7 @@ def send_gmail(run_id: str, recipients: list[str] | None = None, dry_run: bool =
     if not html_path.exists():
         raise FileNotFoundError(f"Missing HTML artifact: {html_path}")
 
-    newsletter = read_json(newsletter_path)
+    newsletter = clean_data(read_json(newsletter_path))
     html_body = html_path.read_text(encoding="utf-8")
     resolved_recipients = recipients or settings.newsletter_default_recipients
     if not resolved_recipients:
@@ -98,6 +123,7 @@ def send_gmail(run_id: str, recipients: list[str] | None = None, dry_run: bool =
             resolved_recipients,
             subject,
             html_body,
+            newsletter,
         )
         response = _request_json(
             GMAIL_SEND_URL,
