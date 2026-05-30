@@ -32,6 +32,23 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> di
         raise RuntimeError(f"Tavily request failed with HTTP {exc.code}: {body[:500]}") from exc
 
 
+def _normalize_tavily_sources(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sources = []
+    for item in results:
+        content = item.get("content") or item.get("snippet") or ""
+        sources.append(
+            {
+                "title": item.get("title", "Untitled source"),
+                "url": item.get("url", ""),
+                "snippet": content,
+                "key_points": [content[:420]] if content else [],
+                "published_date": item.get("published_date", ""),
+                "score": item.get("score", 0),
+            }
+        )
+    return sources
+
+
 def _tavily_research(topic: str, settings: Any) -> dict[str, Any]:
     if not settings.tavily_api_key:
         raise ConfigError("TAVILY_API_KEY is required when Tavily research is used.")
@@ -44,17 +61,7 @@ def _tavily_research(topic: str, settings: Any) -> dict[str, Any]:
         "include_raw_content": False,
     }
     response = _post_json(TAVILY_URL, payload, {"Content-Type": "application/json"})
-    sources = []
-    for item in response.get("results", []):
-        content = item.get("content") or item.get("snippet") or ""
-        sources.append(
-            {
-                "title": item.get("title", "Untitled source"),
-                "url": item.get("url", ""),
-                "snippet": content,
-                "key_points": [content[:280]] if content else [],
-            }
-        )
+    sources = _normalize_tavily_sources(response.get("results", []))
     if not sources:
         raise RuntimeError("Tavily returned no research results.")
     return {
@@ -63,6 +70,56 @@ def _tavily_research(topic: str, settings: Any) -> dict[str, Any]:
         "retrieved_at": utc_now_iso(),
         "query": topic,
         "answer": response.get("answer", ""),
+        "sources": sources,
+    }
+
+
+def _weekly_tavily_research(topic: str, settings: Any) -> dict[str, Any]:
+    if not settings.tavily_api_key:
+        raise ConfigError("TAVILY_API_KEY is required for weekly news research.")
+    queries = [
+        topic,
+        "top artificial intelligence news this week",
+        "AI model releases funding regulation enterprise news this week",
+        "AI agents automation products startups news this week",
+    ]
+    seen_urls: set[str] = set()
+    sources: list[dict[str, Any]] = []
+    answers: list[str] = []
+    for query in queries:
+        payload = {
+            "api_key": settings.tavily_api_key,
+            "query": query,
+            "search_depth": settings.newsletter_search_depth,
+            "topic": "news",
+            "days": settings.weekly_news_days,
+            "time_range": "week",
+            "max_results": max(4, min(settings.weekly_news_max_results, 10)),
+            "include_answer": True,
+            "include_raw_content": False,
+        }
+        response = _post_json(TAVILY_URL, payload, {"Content-Type": "application/json"})
+        if response.get("answer"):
+            answers.append(response["answer"])
+        for source in _normalize_tavily_sources(response.get("results", [])):
+            url = source.get("url", "")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sources.append(source)
+
+    sources.sort(key=lambda item: float(item.get("score") or 0), reverse=True)
+    sources = sources[: settings.weekly_news_max_results]
+    if not sources:
+        raise RuntimeError("Tavily returned no weekly news results.")
+    return {
+        "topic": topic,
+        "provider": "tavily",
+        "research_mode": "weekly_digest",
+        "retrieved_at": utc_now_iso(),
+        "query": topic,
+        "days": settings.weekly_news_days,
+        "answer": "\n\n".join(answers),
         "sources": sources,
     }
 
@@ -98,7 +155,7 @@ def _sample_research(topic: str, max_results: int) -> dict[str, Any]:
     }
 
 
-def research_topic(topic: str, run_id: str | None = None, dry_run: bool = False) -> dict[str, Any]:
+def research_topic(topic: str, run_id: str | None = None, dry_run: bool = False, weekly: bool = False) -> dict[str, Any]:
     if not topic.strip():
         raise ValueError("Topic is required.")
 
@@ -115,7 +172,10 @@ def research_topic(topic: str, run_id: str | None = None, dry_run: bool = False)
     )
 
     if dry_run:
-        result = _sample_research(topic, settings.newsletter_max_results)
+        result = _sample_research(topic, settings.weekly_news_max_results if weekly else settings.newsletter_max_results)
+        if weekly:
+            result["research_mode"] = "weekly_digest"
+            result["days"] = settings.weekly_news_days
     elif provider == "gemini_grounded":
         prompt = (
             "Research this newsletter topic using current web information. "
@@ -161,7 +221,7 @@ def research_topic(topic: str, run_id: str | None = None, dry_run: bool = False)
             result["fallback_from"] = "gemini_grounded"
             result["fallback_reason"] = str(exc)[:500]
     else:
-        result = _tavily_research(topic, settings)
+        result = _weekly_tavily_research(topic, settings) if weekly else _tavily_research(topic, settings)
 
     write_json(context.run_dir / "research.json", result)
     logger.info("Wrote research.json with %s sources", len(result.get("sources", [])))
@@ -173,10 +233,11 @@ def main() -> int:
     parser.add_argument("topic")
     parser.add_argument("--run-id")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--weekly", action="store_true")
     args = parser.parse_args()
     context = get_run_context(args.run_id, args.topic)
     try:
-        research_topic(args.topic, context.run_id, args.dry_run)
+        research_topic(args.topic, context.run_id, args.dry_run, args.weekly)
         print(context.run_dir)
         return 0
     except (ConfigError, Exception) as exc:

@@ -63,6 +63,9 @@ class Settings:
     newsletter_research_provider: str
     newsletter_search_depth: str
     newsletter_max_results: int
+    weekly_news_max_results: int
+    weekly_news_days: int
+    weekly_news_topic: str
 
 
 def load_settings(require_live: bool = False, require_gmail: bool = False) -> Settings:
@@ -84,4 +87,7 @@ def load_settings(require_live: bool = False, require_gmail: bool = False) -> Se
         newsletter_research_provider=get_env("NEWSLETTER_RESEARCH_PROVIDER", "tavily"),
         newsletter_search_depth=get_env("NEWSLETTER_SEARCH_DEPTH", "basic"),
         newsletter_max_results=get_int_env("NEWSLETTER_MAX_RESULTS", 5),
+        weekly_news_max_results=get_int_env("WEEKLY_NEWS_MAX_RESULTS", 12),
+        weekly_news_days=get_int_env("WEEKLY_NEWS_DAYS", 7),
+        weekly_news_topic=get_env("WEEKLY_NEWS_TOPIC", "AI weekly news digest"),
     )

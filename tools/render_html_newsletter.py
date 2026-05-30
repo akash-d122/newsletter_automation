@@ -46,21 +46,34 @@ def _render_sections(sections: list[dict]) -> str:
     accents = ["#0f766e", "#6d4674", "#b7791f"]
     for index, section in enumerate(sections, start=1):
         accent = accents[(index - 1) % len(accents)]
+        label = f"Story {section.get('rank')}" if section.get("rank") else f"Signal {index}"
+        why_it_matters = ""
+        if section.get("why_it_matters"):
+            why_it_matters = f"""
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f3efe7;margin:2px 0 14px 0;">
+                        <tr>
+                          <td style="padding:12px 14px;font-size:14px;line-height:1.5;color:#4b5563;">
+                            <strong style="color:#1f2933;">Why it matters:</strong> {_esc(section.get("why_it_matters"))}
+                          </td>
+                        </tr>
+                      </table>
+            """
         rendered.append(
             f"""
             <tr>
-              <td style="padding:0 30px 24px 30px;">
+              <td class="section-pad" style="padding:0 18px 18px 18px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #e6e1d8;background:#fffdf9;">
                   <tr>
                     <td width="5" style="background:{accent};font-size:1px;line-height:1px;">&nbsp;</td>
-                    <td style="padding:22px 22px 18px 22px;">
-                      <div style="font-size:12px;line-height:1;color:{accent};font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Signal {index}</div>
+                    <td class="card-pad" style="padding:18px 18px 16px 18px;">
+                      <div style="font-size:12px;line-height:1;color:{accent};font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">{_esc(label)}</div>
                       <h2 style="margin:0 0 10px 0;font-family:Georgia,'Times New Roman',serif;font-size:23px;line-height:1.25;color:#1f2933;font-weight:normal;">
                         {_esc(section.get("title"))}
                       </h2>
                       <p style="margin:0 0 16px 0;font-size:16px;line-height:1.65;color:#344054;">
                         {_esc(section.get("body"))}
                       </p>
+                      {why_it_matters}
                       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
                         {_render_bullets(section.get("bullets", []))}
                       </table>
@@ -100,8 +113,8 @@ def _infographic_block(context) -> str:
         return ""
     return """
             <tr>
-              <td style="padding:0 30px 28px 30px;">
-                <img src="cid:newsletter-infographic" width="620" alt="Newsletter infographic" style="display:block;width:100%;max-width:620px;height:auto;border:1px solid #e6e1d8;">
+              <td class="section-pad" style="padding:0 18px 20px 18px;">
+                <img src="cid:newsletter-infographic" width="724" alt="Newsletter infographic" style="display:block;width:100%;max-width:724px;height:auto;border:1px solid #e6e1d8;">
               </td>
             </tr>
             """
@@ -115,6 +128,8 @@ def render_html(run_id: str) -> str:
         raise FileNotFoundError(f"Missing newsletter artifact: {newsletter_path}")
     newsletter = clean_data(read_json(newsletter_path))
     logger.info("Rendering HTML newsletter")
+    read_time = newsletter.get("read_time_minutes") or "5 min"
+    eyebrow = "Weekly AI Digest" if newsletter.get("newsletter_type") == "weekly_digest" else "Weekly Intelligence"
 
     html_doc = f"""<!doctype html>
 <html lang="en">
@@ -127,8 +142,12 @@ def render_html(run_id: str) -> str:
       @media only screen and (max-width: 640px) {{
         .outer-pad {{ padding: 0 !important; }}
         .container {{ width: 100% !important; border-left: 0 !important; border-right: 0 !important; }}
-        .px {{ padding-left: 20px !important; padding-right: 20px !important; }}
-        .hero-title {{ font-size: 34px !important; line-height: 1.08 !important; }}
+        .px {{ padding-left: 14px !important; padding-right: 14px !important; }}
+        .section-pad {{ padding-left: 10px !important; padding-right: 10px !important; }}
+        .card-pad {{ padding: 16px 14px 14px 14px !important; }}
+        .hero-title {{ font-size: 30px !important; line-height: 1.1 !important; }}
+        .brand-logo {{ width: 86px !important; max-width: 86px !important; }}
+        .date-cell {{ font-size: 11px !important; }}
       }}
     </style>
   </head>
@@ -138,16 +157,16 @@ def render_html(run_id: str) -> str:
     </div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f3efe7;">
       <tr>
-        <td class="outer-pad" align="center" style="padding:32px 16px;">
-          <table role="presentation" class="container" width="680" cellspacing="0" cellpadding="0" style="width:680px;max-width:100%;border-collapse:collapse;background:#fffaf2;border:1px solid #ded7ca;">
+        <td class="outer-pad" align="center" style="padding:12px 6px;">
+          <table role="presentation" class="container" width="760" cellspacing="0" cellpadding="0" style="width:760px;max-width:100%;border-collapse:collapse;background:#fffaf2;border:1px solid #ded7ca;">
             <tr>
-              <td class="px" style="padding:26px 34px 18px 34px;border-bottom:1px solid #e7dfd2;">
+              <td class="px" style="padding:16px 22px 12px 22px;border-bottom:1px solid #e7dfd2;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
                   <tr>
                     <td style="font-size:13px;line-height:1.3;color:#0f766e;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;">
-                      <img src="cid:agentic-brief-logo" width="132" alt="Agentic Brief" style="display:block;width:132px;max-width:132px;height:auto;border:0;">
+                      <img class="brand-logo" src="cid:agentic-brief-logo" width="92" alt="Agentic Brief" style="display:block;width:92px;max-width:92px;height:auto;border:0;">
                     </td>
-                    <td align="right" style="font-size:13px;line-height:1.3;color:#8a6f3d;">
+                    <td class="date-cell" align="right" style="font-size:12px;line-height:1.3;color:#8a6f3d;">
                       {_esc(_issue_date())}
                     </td>
                   </tr>
@@ -155,9 +174,9 @@ def render_html(run_id: str) -> str:
               </td>
             </tr>
             <tr>
-              <td class="px" style="padding:36px 34px 26px 34px;background:#fffaf2;">
+              <td class="px" style="padding:26px 22px 22px 22px;background:#fffaf2;">
                 <div style="display:inline-block;padding:6px 10px;background:#e7f4ef;color:#0f766e;font-size:12px;line-height:1;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:18px;">
-                  Weekly Intelligence
+                  {_esc(eyebrow)} · {_esc(read_time)} read
                 </div>
                 <h1 class="hero-title" style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-size:42px;line-height:1.05;color:#1f2933;font-weight:normal;">
                   {_esc(newsletter.get("headline"))}
@@ -169,7 +188,7 @@ def render_html(run_id: str) -> str:
             </tr>
             {_infographic_block(context)}
             <tr>
-              <td style="padding:0 30px 24px 30px;">
+              <td class="section-pad" style="padding:0 18px 18px 18px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#1f2933;">
                   <tr>
                     <td style="padding:20px 22px;">
@@ -184,10 +203,10 @@ def render_html(run_id: str) -> str:
             </tr>
             {_render_sections(newsletter.get("sections", []))}
             <tr>
-              <td style="padding:0 30px 30px 30px;">
+              <td class="section-pad" style="padding:0 18px 22px 18px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f7ead7;border:1px solid #ead8bb;">
                   <tr>
-                    <td style="padding:22px;">
+                    <td class="card-pad" style="padding:18px;">
                       <div style="font-size:12px;line-height:1;color:#9a5b1f;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Next Step</div>
                       <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#2d2a26;">
                         {_esc(newsletter.get("cta"))}
@@ -201,7 +220,7 @@ def render_html(run_id: str) -> str:
               </td>
             </tr>
             <tr>
-              <td class="px" style="padding:24px 34px 30px 34px;background:#ffffff;border-top:1px solid #e7dfd2;">
+              <td class="px" style="padding:20px 22px 24px 22px;background:#ffffff;border-top:1px solid #e7dfd2;">
                 <div style="font-size:12px;line-height:1;color:#6d4674;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;">Sources</div>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
                   {_render_sources(newsletter.get("sources", []))}

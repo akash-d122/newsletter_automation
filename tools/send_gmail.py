@@ -104,9 +104,15 @@ def _message_raw(
     message.set_content(_plain_text(newsletter))
     message.add_alternative(html_body, subtype="html")
     inline_images: list[str] = []
-    logo_path = Path(__file__).resolve().parents[1] / "agentic-brief-logo.jpg"
-    if _add_related_image(message, logo_path, "agentic-brief-logo"):
-        inline_images.append("agentic-brief-logo.jpg")
+    project_root = Path(__file__).resolve().parents[1]
+    for logo_path in [
+        project_root / "agentic-brief-logo.png",
+        project_root / "agentic-brief-logo.jpg",
+        project_root / "agentic-brief-logo.svg",
+    ]:
+        if _add_related_image(message, logo_path, "agentic-brief-logo"):
+            inline_images.append(logo_path.name)
+            break
     for image_path in [run_dir / "infographic.png", run_dir / "infographic.jpg", run_dir / "infographic.webp"]:
         if _add_related_image(message, image_path, "newsletter-infographic"):
             inline_images.append(image_path.name)

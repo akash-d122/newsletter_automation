@@ -19,6 +19,33 @@ from tools.common.text_cleaning import clean_data
 def _fallback_newsletter(research: dict[str, Any]) -> dict[str, Any]:
     topic = research["topic"]
     sources = research.get("sources", [])
+    if research.get("research_mode") == "weekly_digest":
+        sections = []
+        for index, source in enumerate(sources[:6], start=1):
+            sections.append(
+                {
+                    "title": source.get("title", f"Story {index}"),
+                    "body": source.get("snippet", "This story is part of the weekly AI news cycle."),
+                    "bullets": source.get("key_points", [])[:2],
+                    "rank": index,
+                    "why_it_matters": "Track this for market direction, product strategy, and operational impact.",
+                }
+            )
+        return {
+            "topic": topic,
+            "subject": "This Week in AI: the stories that matter",
+            "preheader": "A ranked weekly digest of the top AI news, built for a 5-10 minute read.",
+            "headline": "This Week in AI",
+            "intro": f"This weekly edition ranks the most relevant developments around {topic}, focusing on what changed, why it matters, and what to watch next.",
+            "sections": sections,
+            "takeaway": "The week’s AI news is most useful when filtered through adoption, product movement, regulation, and practical business impact.",
+            "cta": "Use this digest to decide what deserves deeper tracking next week.",
+            "sources": [{"title": item.get("title"), "url": item.get("url")} for item in sources],
+            "generated_at": utc_now_iso(),
+            "generation_mode": "dry_run",
+            "read_time_minutes": "5-10",
+            "newsletter_type": "weekly_digest",
+        }
     return {
         "topic": topic,
         "subject": f"{topic}: what matters now",
@@ -102,6 +129,8 @@ def _newsletter_schema() -> dict:
                         "title": {"type": "string"},
                         "body": {"type": "string"},
                         "bullets": {"type": "array", "items": {"type": "string"}},
+                        "rank": {"type": "integer"},
+                        "why_it_matters": {"type": "string"},
                     },
                     "required": ["title", "body", "bullets"],
                 },
@@ -116,6 +145,8 @@ def _newsletter_schema() -> dict:
                     "required": ["title", "url"],
                 },
             },
+            "read_time_minutes": {"type": "string"},
+            "newsletter_type": {"type": "string"},
         },
         "required": ["topic", "subject", "preheader", "headline", "intro", "sections", "takeaway", "cta", "sources"],
     }
@@ -134,15 +165,28 @@ def generate_newsletter(run_id: str, dry_run: bool = False) -> dict[str, Any]:
     if dry_run:
         newsletter = _fallback_newsletter(research)
     else:
-        prompt = (
-            "Write polished professional newsletter copy from the provided research. "
-            "Outcome: a clear, credible, publication-ready draft with a strong subject line, "
-            "useful executive framing, specific insights, and no unsupported claims. "
-            "Return strict JSON with keys: topic, subject, preheader, headline, intro, "
-            "sections, takeaway, cta, sources. Each section must have title, body, and bullets. "
-            "Use only the provided research and keep the tone confident, concise, and editorial.\n\n"
-            f"Research:\n{json.dumps(research, ensure_ascii=False)}"
-        )
+        if research.get("research_mode") == "weekly_digest":
+            prompt = (
+                "Write a professional weekly AI newsletter from the provided last-7-days research. "
+                "Target a 5-10 minute read: substantial, but not bloated. "
+                "Rank the top 6-8 stories by importance for operators, founders, and technical leaders. "
+                "Each section should cover one story with: what happened, why it matters, and what to watch next. "
+                "Avoid narrow single-topic framing. Synthesize the week across models, products, agents, regulation, funding, enterprise adoption, and infrastructure when present in sources. "
+                "Return strict JSON with keys: topic, subject, preheader, headline, intro, sections, takeaway, cta, sources, read_time_minutes, newsletter_type. "
+                "Each section must have title, body, bullets, rank, and why_it_matters. "
+                "Use only the provided research; do not invent facts.\n\n"
+                f"Research:\n{json.dumps(research, ensure_ascii=False)}"
+            )
+        else:
+            prompt = (
+                "Write polished professional newsletter copy from the provided research. "
+                "Outcome: a clear, credible, publication-ready draft with a strong subject line, "
+                "useful executive framing, specific insights, and no unsupported claims. "
+                "Return strict JSON with keys: topic, subject, preheader, headline, intro, "
+                "sections, takeaway, cta, sources. Each section must have title, body, and bullets. "
+                "Use only the provided research and keep the tone confident, concise, and editorial.\n\n"
+                f"Research:\n{json.dumps(research, ensure_ascii=False)}"
+            )
         generation_config = thinking_config(settings.gemini_thinking_level)
         generation_config["responseMimeType"] = "application/json"
         generation_config["responseSchema"] = _newsletter_schema()
