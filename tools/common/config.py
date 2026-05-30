@@ -57,6 +57,8 @@ class Settings:
     newsletter_from_name: str
     gemini_text_model: str
     gemini_research_model: str
+    gemini_image_model: str
+    gemini_image_fallback_models: list[str]
     gemini_thinking_level: str
     newsletter_research_provider: str
     newsletter_search_depth: str
@@ -76,6 +78,8 @@ def load_settings(require_live: bool = False, require_gmail: bool = False) -> Se
         newsletter_from_name=get_env("NEWSLETTER_FROM_NAME", "Agentic Brief"),
         gemini_text_model=get_env("GEMINI_TEXT_MODEL", "gemini-3.5-flash"),
         gemini_research_model=get_env("GEMINI_RESEARCH_MODEL", "gemini-3.5-flash"),
+        gemini_image_model=get_env("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image"),
+        gemini_image_fallback_models=parse_recipients(get_env("GEMINI_IMAGE_FALLBACK_MODELS", "gemini-2.5-flash-image")),
         gemini_thinking_level=get_env("GEMINI_THINKING_LEVEL", "low"),
         newsletter_research_provider=get_env("NEWSLETTER_RESEARCH_PROVIDER", "tavily"),
         newsletter_search_depth=get_env("NEWSLETTER_SEARCH_DEPTH", "basic"),

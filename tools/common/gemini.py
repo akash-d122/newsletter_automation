@@ -37,6 +37,22 @@ def extract_text(response: dict[str, Any]) -> str:
     return "\n".join(chunks).strip()
 
 
+def extract_inline_images(response: dict[str, Any]) -> list[dict[str, str]]:
+    images: list[dict[str, str]] = []
+    for candidate in response.get("candidates", []):
+        content = candidate.get("content", {})
+        for part in content.get("parts", []):
+            inline_data = part.get("inlineData") or part.get("inline_data")
+            if inline_data and inline_data.get("data"):
+                images.append(
+                    {
+                        "mime_type": inline_data.get("mimeType") or inline_data.get("mime_type") or "image/png",
+                        "data": inline_data["data"],
+                    }
+                )
+    return images
+
+
 def grounding_sources(response: dict[str, Any]) -> list[dict[str, str]]:
     sources: list[dict[str, str]] = []
     seen: set[str] = set()

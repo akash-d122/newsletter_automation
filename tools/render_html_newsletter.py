@@ -94,6 +94,19 @@ def _render_sources(sources: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def _infographic_block(context) -> str:
+    image_paths = list(context.run_dir.glob("infographic.png")) + list(context.run_dir.glob("infographic.jpg")) + list(context.run_dir.glob("infographic.webp"))
+    if not image_paths:
+        return ""
+    return """
+            <tr>
+              <td style="padding:0 30px 28px 30px;">
+                <img src="cid:newsletter-infographic" width="620" alt="Newsletter infographic" style="display:block;width:100%;max-width:620px;height:auto;border:1px solid #e6e1d8;">
+              </td>
+            </tr>
+            """
+
+
 def render_html(run_id: str) -> str:
     context = get_run_context(run_id)
     logger = setup_logger("render_html_newsletter", context.log_path)
@@ -132,7 +145,7 @@ def render_html(run_id: str) -> str:
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
                   <tr>
                     <td style="font-size:13px;line-height:1.3;color:#0f766e;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;">
-                      Agentic Brief
+                      <img src="cid:agentic-brief-logo" width="132" alt="Agentic Brief" style="display:block;width:132px;max-width:132px;height:auto;border:0;">
                     </td>
                     <td align="right" style="font-size:13px;line-height:1.3;color:#8a6f3d;">
                       {_esc(_issue_date())}
@@ -154,6 +167,7 @@ def render_html(run_id: str) -> str:
                 </p>
               </td>
             </tr>
+            {_infographic_block(context)}
             <tr>
               <td style="padding:0 30px 24px 30px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#1f2933;">

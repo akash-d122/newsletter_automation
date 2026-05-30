@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import mimetypes
 import sys
 import urllib.error
 import urllib.parse
@@ -75,15 +76,43 @@ def _plain_text(newsletter: dict[str, Any]) -> str:
     return "\n".join(line for line in lines if line is not None).strip()
 
 
-def _message_raw(sender: str, from_name: str, recipients: list[str], subject: str, html_body: str, newsletter: dict[str, Any]) -> str:
+def _add_related_image(message: EmailMessage, path: Path, cid: str) -> bool:
+    if not path.exists():
+        return False
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if not mime_type or not mime_type.startswith("image/"):
+        return False
+    maintype, subtype = mime_type.split("/", 1)
+    html_part = message.get_payload()[-1]
+    html_part.add_related(path.read_bytes(), maintype=maintype, subtype=subtype, cid=f"<{cid}>")
+    return True
+
+
+def _message_raw(
+    sender: str,
+    from_name: str,
+    recipients: list[str],
+    subject: str,
+    html_body: str,
+    newsletter: dict[str, Any],
+    run_dir: Path,
+) -> tuple[str, list[str]]:
     message = EmailMessage()
     message["From"] = f"{from_name} <{sender}>"
     message["To"] = ", ".join(recipients)
     message["Subject"] = subject
     message.set_content(_plain_text(newsletter))
     message.add_alternative(html_body, subtype="html")
+    inline_images: list[str] = []
+    logo_path = Path(__file__).resolve().parents[1] / "agentic-brief-logo.jpg"
+    if _add_related_image(message, logo_path, "agentic-brief-logo"):
+        inline_images.append("agentic-brief-logo.jpg")
+    for image_path in [run_dir / "infographic.png", run_dir / "infographic.jpg", run_dir / "infographic.webp"]:
+        if _add_related_image(message, image_path, "newsletter-infographic"):
+            inline_images.append(image_path.name)
+            break
     encoded = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-    return encoded.rstrip("=")
+    return encoded.rstrip("="), inline_images
 
 
 def send_gmail(run_id: str, recipients: list[str] | None = None, dry_run: bool = False) -> dict[str, Any]:
@@ -117,13 +146,14 @@ def send_gmail(run_id: str, recipients: list[str] | None = None, dry_run: bool =
         }
     else:
         token = _access_token(settings.google_client_id, settings.google_client_secret, settings.google_refresh_token)
-        raw_message = _message_raw(
+        raw_message, inline_images = _message_raw(
             settings.gmail_sender_email,
             settings.newsletter_from_name,
             resolved_recipients,
             subject,
             html_body,
             newsletter,
+            context.run_dir,
         )
         response = _request_json(
             GMAIL_SEND_URL,
@@ -135,6 +165,7 @@ def send_gmail(run_id: str, recipients: list[str] | None = None, dry_run: bool =
             "sent": True,
             "subject": subject,
             "recipients": resolved_recipients,
+            "inline_images": inline_images,
             "gmail_response": response,
             "timestamp": utc_now_iso(),
         }

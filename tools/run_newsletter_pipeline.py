@@ -12,6 +12,7 @@ from tools.common.file_io import write_json
 from tools.common.logging_setup import setup_logger
 from tools.common.run_context import get_run_context, record_error, utc_now_iso
 from tools.generate_infographic_prompt import generate_infographic_prompt
+from tools.generate_infographic_image import generate_infographic_image
 from tools.generate_newsletter import generate_newsletter
 from tools.render_html_newsletter import render_html
 from tools.research_topic import research_topic
@@ -40,6 +41,16 @@ def run_pipeline(topic: str, recipients: list[str] | None = None, run_id: str | 
         research_topic(topic, context.run_id, dry_run)
         generate_newsletter(context.run_id, dry_run)
         generate_infographic_prompt(context.run_id, dry_run)
+        try:
+            generate_infographic_image(context.run_id, dry_run)
+        except Exception as exc:
+            record_error(
+                context,
+                "generate_infographic_image",
+                exc,
+                "Image generation is non-blocking. Check Gemini image model quota/access, then rerun this stage.",
+            )
+            logger.warning("Continuing without generated infographic image: %s", exc)
         render_html(context.run_id)
         send_gmail(context.run_id, recipients, dry_run)
     except Exception as exc:

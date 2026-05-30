@@ -27,4 +27,4 @@ python tools/run_newsletter_pipeline.py "AI agents for small businesses" --recip
 
 Required live credentials live in `.env`: `GEMINI_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GMAIL_SENDER_EMAIL`, `NEWSLETTER_DEFAULT_RECIPIENTS`, and `NEWSLETTER_FROM_NAME`. `TAVILY_API_KEY` is only required when `NEWSLETTER_RESEARCH_PROVIDER=tavily`.
 
-The default research provider is Tavily, reserving Gemini quota for `gemini-3.5-flash` newsletter copy and infographic prompt generation. Gmail delivery stays on Gmail API OAuth because Google recommends Sign in with Google instead of app passwords for account security.
+The default research provider is Tavily, reserving Gemini quota for `gemini-3.5-flash` newsletter copy and `gemini-3.1-flash-image` infographic generation. Gmail delivery embeds the project logo and generated infographic as inline images through Gmail API OAuth.
